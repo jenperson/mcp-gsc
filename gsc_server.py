@@ -1732,6 +1732,11 @@ def main():
     if transport == "stdio":
         mcp.run(transport="stdio")
     elif transport in {"sse", "http", "streamable-http"}:
+        # Disable FastMCP's built-in host-header validation. The server runs behind
+        # a reverse proxy (e.g. Koyeb) where the Host header is the external domain,
+        # not localhost — causing 421 Misdirected Request. Authentication is handled
+        # by _ApiKeyMiddleware instead.
+        mcp.settings.transport_security = None
         api_key = os.environ.get("MCP_API_KEY", "").strip()
         if api_key:
             import uvicorn
