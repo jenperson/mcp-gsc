@@ -41,6 +41,11 @@ def _expand_path(path: Optional[str]) -> Optional[str]:
 # where mounting files is inconvenient — e.g. Koyeb, Fly.io, Railway).
 GSC_CREDENTIALS_JSON = os.environ.get("GSC_CREDENTIALS_JSON", "").strip()
 
+# Raw OAuth token JSON (output of Credentials.to_json()) for platform deployments
+# where a browser flow is impossible. Generate locally via the reauthenticate tool,
+# then store the contents of token.json as this env var.
+GSC_TOKEN_JSON = os.environ.get("GSC_TOKEN_JSON", "").strip()
+
 # Path to your service account JSON or user credentials JSON
 # First check if GSC_CREDENTIALS_PATH environment variable is set
 # Then try looking in the script directory and current working directory as fallbacks
@@ -123,6 +128,20 @@ def get_gsc_service():
             f"If running via uvx, this MUST be an absolute path to your OAuth "
             f"client_secrets.json file."
         )
+
+    # Try inline OAuth token (GSC_TOKEN_JSON env var) — preferred for platform
+    # deployments where a browser flow is impossible. The token auto-refreshes
+    # using the embedded refresh_token as long as the app is in production mode.
+    if GSC_TOKEN_JSON:
+        try:
+            creds = Credentials.from_authorized_user_info(json.loads(GSC_TOKEN_JSON), SCOPES)
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            return build("searchconsole", "v1", credentials=creds, cache_discovery=False)
+        except Exception as e:
+            raise ValueError(
+                f"GSC_TOKEN_JSON is set but could not be used for authentication: {e}"
+            )
 
     # Try OAuth authentication first if not skipped
     if not SKIP_OAUTH:

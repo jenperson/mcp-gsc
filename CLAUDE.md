@@ -34,6 +34,7 @@ Set `GSC_SKIP_OAUTH=true` to force service account mode and skip OAuth entirely.
 | `GSC_ALLOW_DESTRUCTIVE` | `false` | Set `true` to enable `add_site`, `delete_site`, `delete_sitemap` |
 | `GSC_CREDENTIALS_PATH` | — | Path to service account JSON key file |
 | `GSC_CREDENTIALS_JSON` | — | Raw service account JSON content (use instead of `GSC_CREDENTIALS_PATH` on platforms where file mounts aren't available, e.g. Koyeb) |
+| `GSC_TOKEN_JSON` | — | Raw OAuth token JSON (contents of `token.json`) for platform deployments where a browser flow is impossible. Generate locally, store as a secret. Auto-refreshes via embedded refresh token. |
 | `GSC_OAUTH_CLIENT_SECRETS_FILE` | `client_secrets.json` | Path to OAuth client secrets file |
 | `GSC_SKIP_OAUTH` | `false` | Set `true` to skip OAuth and use service account only |
 | `MCP_API_KEY` | — | Shared secret to authenticate remote clients. Required for any public deployment. Sent as `Authorization: Bearer <key>` or `X-Api-Key: <key>` |
