@@ -134,7 +134,11 @@ def get_gsc_service():
     # using the embedded refresh_token as long as the app is in production mode.
     if GSC_TOKEN_JSON:
         try:
-            creds = Credentials.from_authorized_user_info(json.loads(GSC_TOKEN_JSON), SCOPES)
+            # Use raw_decode so trailing whitespace or extra characters after the
+            # closing brace (common when secrets are captured via shell heredocs or
+            # platform secret managers) don't cause a JSON parse failure.
+            token_data, _ = json.JSONDecoder().raw_decode(GSC_TOKEN_JSON.strip())
+            creds = Credentials.from_authorized_user_info(token_data, SCOPES)
             if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             return build("searchconsole", "v1", credentials=creds, cache_discovery=False)
