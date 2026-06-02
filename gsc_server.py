@@ -1707,7 +1707,12 @@ class _ApiKeyMiddleware:
 
             provided = ""
             if auth.lower().startswith("bearer "):
-                provided = auth[7:].strip()
+                token = auth[7:].strip()
+                # Guard against double "Bearer Bearer <key>" if the client
+                # includes the prefix in the header value and the proxy adds it again.
+                if token.lower().startswith("bearer "):
+                    token = token[7:].strip()
+                provided = token
             elif x_api_key:
                 provided = x_api_key
 
