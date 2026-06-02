@@ -14,7 +14,8 @@ COPY gsc_server.py .
 # or mount client_secrets.json and token.json for OAuth.
 ENV MCP_TRANSPORT=sse
 ENV MCP_HOST=0.0.0.0
+ENV MCP_PORT=8000
 
-EXPOSE 3001
+EXPOSE 8000
 
 CMD ["uv", "run", "--no-sync", "python", "gsc_server.py"]
