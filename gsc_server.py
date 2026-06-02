@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+import hmac
 import logging
 import os
 import json
@@ -1656,6 +1657,50 @@ async def reauthenticate() -> str:
         return f"Error during reauthentication: {str(e)}"
 
 
+class _ApiKeyMiddleware:
+    """ASGI middleware that validates a shared secret on every HTTP request.
+
+    Accepts the key as:
+      - ``Authorization: Bearer <key>`` header, or
+      - ``X-Api-Key: <key>`` header.
+
+    Enabled by setting the ``MCP_API_KEY`` environment variable.
+    Uses ``hmac.compare_digest`` for constant-time comparison to prevent
+    timing-based side-channel attacks.
+    """
+
+    def __init__(self, app, api_key: str) -> None:
+        self._app = app
+        self._key = api_key.encode()
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http":
+            headers = {k.lower(): v for k, v in scope.get("headers", [])}
+            auth = headers.get(b"authorization", b"").decode()
+            x_api_key = headers.get(b"x-api-key", b"").decode()
+
+            provided = ""
+            if auth.lower().startswith("bearer "):
+                provided = auth[7:]
+            elif x_api_key:
+                provided = x_api_key
+
+            if not hmac.compare_digest(provided.encode(), self._key):
+                body = json.dumps({"error": "Unauthorized"}).encode()
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [
+                        [b"content-type", b"application/json"],
+                        [b"content-length", str(len(body)).encode()],
+                    ],
+                })
+                await send({"type": "http.response.body", "body": body})
+                return
+
+        await self._app(scope, receive, send)
+
+
 def main():
     """Entry point for the MCP server. Supports stdio (default) and SSE transports."""
     transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
@@ -1668,7 +1713,17 @@ def main():
     if transport == "stdio":
         mcp.run(transport="stdio")
     elif transport in {"sse", "http"}:
-        mcp.run(transport="sse", host=host, port=port)
+        api_key = os.environ.get("MCP_API_KEY", "").strip()
+        if api_key:
+            import uvicorn
+            secured_app = _ApiKeyMiddleware(mcp.sse_app(), api_key)
+            uvicorn.run(secured_app, host=host, port=port)
+        else:
+            logging.warning(
+                "MCP_API_KEY is not set. The server is publicly accessible "
+                "without authentication. Set MCP_API_KEY to secure the endpoint."
+            )
+            mcp.run(transport="sse", host=host, port=port)
     else:
         raise ValueError(
             f"Unknown MCP_TRANSPORT '{transport}'. "

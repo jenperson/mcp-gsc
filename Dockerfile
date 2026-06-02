@@ -8,5 +8,13 @@ RUN uv sync --no-cache --no-install-project
 # Copy application code
 COPY gsc_server.py .
 
-# Default to stdio transport; override with MCP_TRANSPORT=sse for remote/network use
+# Use SSE transport and bind to all interfaces so traffic can reach the container.
+# MCP_API_KEY must be injected at runtime (e.g. via -e or a secrets manager).
+# For Google auth, mount a service account key and set GSC_CREDENTIALS_PATH,
+# or mount client_secrets.json and token.json for OAuth.
+ENV MCP_TRANSPORT=sse
+ENV MCP_HOST=0.0.0.0
+
+EXPOSE 3001
+
 CMD ["uv", "run", "--no-sync", "python", "gsc_server.py"]

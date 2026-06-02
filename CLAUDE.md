@@ -35,6 +35,7 @@ Set `GSC_SKIP_OAUTH=true` to force service account mode and skip OAuth entirely.
 | `GSC_CREDENTIALS_PATH` | — | Path to service account JSON key file |
 | `GSC_OAUTH_CLIENT_SECRETS_FILE` | `client_secrets.json` | Path to OAuth client secrets file |
 | `GSC_SKIP_OAUTH` | `false` | Set `true` to skip OAuth and use service account only |
+| `MCP_API_KEY` | — | Shared secret to authenticate remote clients. Required for any public deployment. Sent as `Authorization: Bearer <key>` or `X-Api-Key: <key>` |
 
 ## Adding a new tool
 
