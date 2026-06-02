@@ -1721,7 +1721,7 @@ class _ApiKeyMiddleware:
 
 
 def main():
-    """Entry point for the MCP server. Supports stdio (default) and SSE transports."""
+    """Entry point for the MCP server. Supports stdio (default), SSE, and streamable-http transports."""
     transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
     host = os.environ.get("MCP_HOST", "127.0.0.1")
     try:
@@ -1731,22 +1731,27 @@ def main():
 
     if transport == "stdio":
         mcp.run(transport="stdio")
-    elif transport in {"sse", "http"}:
+    elif transport in {"sse", "http", "streamable-http"}:
         api_key = os.environ.get("MCP_API_KEY", "").strip()
         if api_key:
             import uvicorn
-            secured_app = _ApiKeyMiddleware(mcp.sse_app(), api_key)
+            if transport == "sse":
+                base_app = mcp.sse_app()
+            else:
+                base_app = mcp.streamable_http_app()
+            secured_app = _ApiKeyMiddleware(base_app, api_key)
             uvicorn.run(secured_app, host=host, port=port)
         else:
             logging.warning(
                 "MCP_API_KEY is not set. The server is publicly accessible "
                 "without authentication. Set MCP_API_KEY to secure the endpoint."
             )
-            mcp.run(transport="sse", host=host, port=port)
+            actual_transport = "sse" if transport == "sse" else "streamable-http"
+            mcp.run(transport=actual_transport, host=host, port=port)
     else:
         raise ValueError(
             f"Unknown MCP_TRANSPORT '{transport}'. "
-            "Use 'stdio' (default) or 'sse'."
+            "Use 'stdio' (default), 'sse', or 'streamable-http'."
         )
 
 
