@@ -37,6 +37,10 @@ def _expand_path(path: Optional[str]) -> Optional[str]:
     return os.path.expandvars(os.path.expanduser(path))
 
 
+# Raw service account JSON content (alternative to GSC_CREDENTIALS_PATH for platforms
+# where mounting files is inconvenient — e.g. Koyeb, Fly.io, Railway).
+GSC_CREDENTIALS_JSON = os.environ.get("GSC_CREDENTIALS_JSON", "").strip()
+
 # Path to your service account JSON or user credentials JSON
 # First check if GSC_CREDENTIALS_PATH environment variable is set
 # Then try looking in the script directory and current working directory as fallbacks
@@ -129,7 +133,22 @@ def get_gsc_service():
             logging.warning("OAuth authentication failed: %s", e)
             pass
     
-    # Try service account authentication
+    # Try inline JSON credentials (GSC_CREDENTIALS_JSON env var) — preferred for
+    # platform deployments where file mounts are not available.
+    if GSC_CREDENTIALS_JSON:
+        try:
+            info = json.loads(GSC_CREDENTIALS_JSON)
+            creds = service_account.Credentials.from_service_account_info(
+                info, scopes=SCOPES
+            )
+            return build("searchconsole", "v1", credentials=creds, cache_discovery=False)
+        except Exception as e:
+            raise ValueError(
+                f"GSC_CREDENTIALS_JSON is set but could not be parsed as a valid "
+                f"service account JSON: {e}"
+            )
+
+    # Try service account authentication via file paths
     for cred_path in POSSIBLE_CREDENTIAL_PATHS:
         if cred_path and os.path.exists(cred_path):
             try:
