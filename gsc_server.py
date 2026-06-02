@@ -1711,7 +1711,19 @@ class _ApiKeyMiddleware:
             elif x_api_key:
                 provided = x_api_key
 
+            logging.debug(
+                "Auth check: authorization_present=%s x_api_key_present=%s "
+                "provided_len=%d expected_len=%d",
+                bool(auth), bool(x_api_key), len(provided), len(self._key),
+            )
+
             if not provided or not hmac.compare_digest(provided.encode(), self._key):
+                logging.warning(
+                    "Auth failed: path=%s provided_len=%d expected_len=%d "
+                    "has_bearer=%s has_x_api_key=%s",
+                    scope.get("path"), len(provided), len(self._key),
+                    auth.lower().startswith("bearer "), bool(x_api_key),
+                )
                 body = json.dumps({"error": "Unauthorized"}).encode()
                 await send({
                     "type": "http.response.start",
@@ -1745,6 +1757,7 @@ def main():
         # by _ApiKeyMiddleware instead.
         mcp.settings.transport_security = None
         api_key = os.environ.get("MCP_API_KEY", "").strip()
+        logging.warning("MCP_API_KEY loaded: present=%s len=%d", bool(api_key), len(api_key))
         if api_key:
             import uvicorn
             if transport == "sse":
@@ -1752,7 +1765,7 @@ def main():
             else:
                 base_app = mcp.streamable_http_app()
             secured_app = _ApiKeyMiddleware(base_app, api_key)
-            uvicorn.run(secured_app, host=host, port=port)
+            uvicorn.run(secured_app, host=host, port=port, log_level="debug")
         else:
             logging.warning(
                 "MCP_API_KEY is not set. The server is publicly accessible "
