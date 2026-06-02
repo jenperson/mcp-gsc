@@ -1694,17 +1694,24 @@ class _ApiKeyMiddleware:
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] == "http":
+            # Allow public discovery endpoints through without auth so MCP clients
+            # (e.g. Mistral Connectors) can read the server card and learn what
+            # authentication the server requires before sending credentials.
+            if scope.get("path", "").startswith("/.well-known/"):
+                await self._app(scope, receive, send)
+                return
+
             headers = {k.lower(): v for k, v in scope.get("headers", [])}
-            auth = headers.get(b"authorization", b"").decode()
-            x_api_key = headers.get(b"x-api-key", b"").decode()
+            auth = headers.get(b"authorization", b"").decode().strip()
+            x_api_key = headers.get(b"x-api-key", b"").decode().strip()
 
             provided = ""
             if auth.lower().startswith("bearer "):
-                provided = auth[7:]
+                provided = auth[7:].strip()
             elif x_api_key:
                 provided = x_api_key
 
-            if not hmac.compare_digest(provided.encode(), self._key):
+            if not provided or not hmac.compare_digest(provided.encode(), self._key):
                 body = json.dumps({"error": "Unauthorized"}).encode()
                 await send({
                     "type": "http.response.start",
